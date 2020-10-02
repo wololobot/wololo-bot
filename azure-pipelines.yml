@@ -80,5 +80,5 @@ stages:
         WebAppName: $(terraform.appServiceName)
         RemoveAdditionalFilesFlag: true
         Package: "$(Pipeline.Workspace)/*.zip"
-        StartupCommand: "App_Data\Jobs\Continuous\Wololo_Bot\Wololo.Discord.Bot.exe"
+        StartupCommand: "App_Data/Jobs/Continuous/Wololo_Bot/Wololo.Discord.Bot.exe"
         
