@@ -1,0 +1,84 @@
+trigger:
+  - main
+  - dev
+
+variables:
+- group: Terraform
+- name: artifactName
+  value: "Arty"
+
+stages:
+- stage: publish_app
+  displayName: "Publish App"
+  jobs:
+  - job: config_and_publish
+    displayName: "Configure and Publish"
+    steps:
+    - task: UseDotNet@2
+      displayName: "Use .NET 5.x"
+      inputs:
+        packageType: "sdk"
+        version: "5.x"
+        includePreviewVersions: true
+    - task: NuGetAuthenticate@0
+      displayName: "NuGet Authenticate"
+    - task: DotNetCoreCLI@2
+      displayName: "Publish Self-Contained Executable"
+      inputs:
+        command: "publish"
+        publishWebProjects: false
+        projects: "$(Pipeline.Workspace)/s/Wololo.Discord.Bot.csproj"
+        arguments: "-r win-x64 -o $(Build.ArtifactStagingDirectory)/App_Data/Jobs/Continuous/Wololo_Bot"
+        zipAfterPublish: false
+        modifyOutputPath: false
+    - task: Bash@3
+      name: zip
+      displayName: "Zip as WebJob"
+      inputs:
+        targetType: "inline"
+        script: |
+          pushd $(Build.ArtifactStagingDirectory)
+          zip -r Wololo_Bot.zip App_Data
+          rm -rf App_Data
+          popd
+    - task: PublishPipelineArtifact@1
+      displayName: "Publish Pipeline Artifacts"
+      inputs:
+        targetPath: $(Build.ArtifactStagingDirectory)
+        artifactName: $(artifactName)
+- stage: deploy_app
+  displayName: "Deploy App"
+  condition: succeeded()
+  jobs:
+  - job: config_and_deploy
+    displayName: "Configure and Deploy"
+    steps:
+    - task: DownloadPipelineArtifact@2
+      displayName: "Download Pipeline Artifacts"
+      inputs:
+        artifactName: $(artifactName)
+    - task: Bash@3
+      name: terraform
+      displayName: "Retrieve App Service Name"
+      inputs:
+        targetType: "inline"
+        script: |
+          pushd inf/live/dev
+          terraform init
+          echo "##vso[task.setvariable variable=appServiceName;isOutput=true]$(terraform output az_discord_bot_app_name)"
+          popd
+      env:
+        ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+        ARM_TENANT_ID: $(ARM_TENANT_ID)
+        ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+        ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+    - task: AzureRMWebAppDeployment@4
+      displayName: "Azure App Deployment"
+      inputs:
+        ConnectedServiceName: "Azure Service Principal"
+        WebAppKind: functionAppLinux 
+        WebAppName: $(terraform.appServiceName)
+        RemoveAdditionalFilesFlag: true
+        Package: "$(Pipeline.Workspace)/*.zip"
+        StartupCommand: "App_Data\Jobs\Continuous\Wololo_Bot\Wololo.Discord.Bot.exe"
+        
