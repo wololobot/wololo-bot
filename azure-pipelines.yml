@@ -76,9 +76,10 @@ stages:
       displayName: "Azure App Deployment"
       inputs:
         ConnectedServiceName: "Azure Service Principal"
-        WebAppKind: functionAppLinux 
+        WebAppKind: functionApp 
         WebAppName: $(terraform.appServiceName)
         RemoveAdditionalFilesFlag: true
+        UseWebDeploy: false
         Package: "$(Pipeline.Workspace)/*.zip"
-        StartupCommand: "App_Data/Jobs/Continuous/Wololo_Bot/Wololo.Discord.Bot.exe"
+        StartupCommand: "Wololo.Discord.Bot.exe"
         
